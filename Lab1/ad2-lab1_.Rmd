@@ -1,0 +1,228 @@
+---
+title: "Lab1-CEAP"
+author: "João Lucas"
+output: html_document
+---
+```{r}
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(tidyr)
+```
+
+```{r}
+df<- read.csv("/home/joaolaf/Área de Trabalho/AD2/Lab1/dadosCEAP.csv")
+df$valorGlosa <- as.numeric(sub(",", ".", df$valorGlosa, fixed = TRUE))
+```
+
+
+```{r}
+a <- df %>% group_by(sgPartido) %>% 
+    summarise(qntPartido = n(), totalgasto= sum(valorLíquido))
+
+```
+
+<h2>1.Quais os partidos que mais fazem uso da CEAP? Quais os partidos que menos fazem uso? Mesmas perguntas conisderando valores em R$.</h2>
+
+
+*Para responder essa primeira pergunta,teremos que consultar quantas vezes um dado número de partidos aparece na lista da CEAP, ou seja, a quantidade em que o nome do partido é listado, por qualquer que seja o serviço ou qualquer outro parâmetro presente na lista.*
+
+```{r, warning=FALSE}
+
+a<-a[!is.na(a$sgPartido),]
+a<- a[order(a$qntPartido,decreasing = TRUE),]
+a$indexQNT <- factor(a$sgPartido,levels = a$sgPartido)
+
+p <- plot_ly(a, x = ~indexQNT, y = ~qntPartido, type = 'bar', name = 'Partidos por frequencia') %>%
+    layout(title = "Partidos por frequencia", xaxis = list(title = ""),yaxis = list(title = "Quantas vezes cada partido aparece"),barmode='stack')
+p
+
+```
+
+
+
+
+
+
+*Já quando se trata dos partidos que mai usam dinheiro, o gráfico não parece ter muita diferença. Apenas uma leve mudança entre um partido e outro, mas, certamente, os que mais usam são também os que mais gastam.*
+
+
+```{r}
+
+a <- a[order(a$totalgasto,decreasing = TRUE),]
+a$indexGasto <- factor(a$sgPartido,levels=a$sgPartido)
+
+
+p <- plot_ly(a, x = ~indexGasto, y = ~totalgasto, type = 'bar', name = 'Partidos por gasto') %>%
+    layout(title = "Partidos por gasto", xaxis = list(title = ""),yaxis = list(title = "Gasto de cada partido"),barmode='stack')
+p
+
+```
+
+<h2>2.Quais os tipos de despesa mais comuns no uso da CEAP? Mesma pergunta considerando valores em R$.</h2>
+
+
+*Para responder a segunda questão, vamos mostrar quantas vezes cada tipo de despesa aparece:*
+```{r}
+
+b<- df %>% group_by(tipoDespesa)%>%
+  summarise(quantasDespesas=n(),totalgastoDespesas = sum(valorLíquido))
+
+p <- plot_ly(b,labels=~tipoDespesa,values=~quantasDespesas,type='pie') %>%
+    layout(title = 'Maiores despesas do CEAP',
+         xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+p
+```
+*Podemos ver no gráfico que:*
+      *As duas maiores depsesas são: Emissão de Billhete Aéreo e Combustíveis e lubrificantes, 31.2% e 20.4% respectivamente*
+      
+      
+      *As duas menores despesas são:Participação em curso,palesta ou evento similiare locação ou fretamento de embarcações,0.00675% e 0.00965% respectivamente*
+
+
+
+
+
+*Fazendo isso também em função dos gastos para cada tipo de despesa,podemos ver as três despesas que mais gastas e as três que menos gastam, que são:*
+```{r}
+b2<-b[order(b$totalgastoDespesas,decreasing = TRUE),]
+#b4<-head(b2,3)
+#b6<-tail(b2,3)
+
+despesas_frame_gastos<- rbind(head(b2,3),tail(b2,3))
+
+
+
+despesas_frame_gastos<- despesas_frame_gastos[order(despesas_frame_gastos$totalgastoDespesas,decreasing = TRUE),]
+despesas_frame_gastos$indexDespesas <- factor(despesas_frame_gastos$tipoDespesa,levels = despesas_frame_gastos$tipoDespesa)
+
+p <- plot_ly(despesas_frame_gastos, x = ~indexDespesas, y = ~totalgastoDespesas, type = 'bar', name = 'Partidos por gasto') %>%
+    layout(title = "Despesas por Gasto", xaxis = list(title = ""),yaxis = list(title = "Gasto a cada despesa"),barmode='stack')
+p
+
+```
+
+<h2>3Levando em conta o estado pelo qual o deputado se elegeu, quais os estados que mais fazem uso da CEAP? Quais os que menos fazem uso? Mesmas perguntas considerando gastos em R$. Por que você acha isso?</h2>
+
+
+*Para a terceira questão, vamos agrupar os dados apenas pelos estados, já que os dados que tem os estados já é cada estado em que o parlamentar foi eleito*
+```{r}
+c<- df %>% group_by(sgUF)%>%
+  summarise(totalEstados = n())
+```
+
+*Logo após isso, podemos visualizar as vezes que cada estado apareceu, mostrando exatamente o número de parlamentares que usam o CEAP no seu estado*
+```{r}
+
+c<-c[order(c$totalEstados,decreasing = TRUE),]
+c$indexUF <- factor(c$sgUF,levels = c$sgUF)
+
+
+p <- plot_ly(c, x = ~indexUF, y = ~totalEstados, type = 'bar', name = 'Chamadas do CEAP por estado') %>%
+    layout(title = "Chamadas do CEAP por estado", xaxis = list(title = "Estados"),yaxis = list(title = "Frequência dos estados"),barmode='stack')
+p
+
+```
+*Podemos perceber que SP é o extremo do gráfico, ficando como estado que mais aciona o CEAP. Já o estado do TO, fica em último lugar no gráfico*
+
+
+
+*Podemos observar isso também do ponto de vista financeiro,separando os estados pela sua cota de valor líquido:*
+```{r}
+cGasto<- df%>%group_by(sgUF)%>%
+  summarise(totalEstadoLiquido = sum(valorLíquido))
+
+
+```
+
+*E apresentamos os dados:*
+```{r}
+
+cGasto<-cGasto[!is.na(cGasto$sgUF),]
+cGasto<-cGasto[order(cGasto$totalEstadoLiquido,decreasing = TRUE),]
+
+cGasto$indexGasto <- factor(cGasto$sgUF,levels =cGasto$sgUF)
+
+p <- plot_ly(cGasto, x = ~indexGasto, y = ~totalEstadoLiquido, type = 'bar', name = 'Gasto por estado') %>%
+    layout(title = "Gasto por estado", xaxis = list(title = "Estados"),yaxis = list(title = "Gastos"),barmode='stack')
+p
+
+```
+*Mas por que São Paulo apresenta uma diferença tão grande? Podemos mostrar em um gráfico que SP é o estado que tem mais parlamentares eleitos, operando o seguinte frame:*
+
+```{r}
+dfSP <- df %>% group_by(nomeParlamentar,sgUF) %>%
+  summarise()
+```
+*Logo depois, podemos ver o número de parlamentares por cada estado*
+```{r}
+dfSP1 <- dfSP %>% group_by(sgUF) %>%
+  summarise(contaEstados = n())
+ 
+dfSP1 <- dfSP1[!is.na(dfSP1$sgUF),]
+dfSP1<- dfSP1[order(dfSP1$contaEstados,decreasing = TRUE),]
+dfSP1$index_contaEstados <- factor(dfSP1$sgUF,levels = dfSP1$sgUF)
+
+p <- plot_ly(dfSP1, x = ~index_contaEstados, y = ~contaEstados, type = 'scatter',mode='lines', name = 'Número de deputados por estado') %>%
+    layout(title = "Número de deputados por estado", xaxis = list(title = "Estados"),yaxis = list(title = "Número de deputados"),barmode='stack')
+p
+
+```
+
+<h2>4.Quais os parlamentares que mais gastam com CEAP e quais os que menos gastam?</h2>
+
+
+*some*
+
+```{r}
+d<- df %>% group_by(nomeParlamentar,valorLíquido) %>%
+  summarise()
+```
+
+
+```{r}
+d$indexGasto <- factor(d$valorLíquido,levels =d$valorLíquido)
+d <- d[order(d$valorLíquido,decreasing = TRUE),]
+
+
+d <- head(d,2)
+
+p <- plot_ly(x = ~d$nomeParlamentar,y=~d$indexGasto, type="box")
+p
+```
+<h2>5. Existe correlação entre a quantidade de gastos no exterior e o valor restituído da CEAP? </h2>
+
+*Para responder a quinta questão, teremos que usar o conceito de correlação, onde vamos procurar saber se teremos uma correlação forte ou fraca entre os dados que iremos apresentar, que são: Quantidade de gastos no exterior e o valor restituído da CEAP*
+
+
+*Podemos pegar esses dois valores agrupando pelos seguintes frames abaixo*
+
+```{r}
+
+
+gastosExt <- df %>% filter(tipoDocumento == 2) %>% group_by(sgUF) %>%
+  summarise(valorGastoExt = n())
+
+gastoLiq <- df %>%  group_by(sgUF) %>%
+  summarise(valorGastoLiq = sum(valorLíquido))
+
+gastos_liq_exterior <-(inner_join(gastosExt,gastoLiq,"sgUF"))
+
+ggplot(gastos_liq_exterior, aes(x=valorGastoExt, y=valorGastoLiq)) +
+    geom_point(shape=1) +
+    geom_smooth(method=lm) 
+```
+
+*Já podemos ver pelo gráfico que a correlação de uma com a outra é bem baixa. Para confirmar isso, podemos mostrar pela função que mostra a correlação em números. Vendo que essa correlação é 0.01361584, temos que ela realmente é bem baixa.*
+
+```{r}
+correlacao <- cor(gastos_liq_exterior$valorGastoExt, gastos_liq_exterior$valorGastoLiq)
+correlacao
+
+```
+
+
+
+
