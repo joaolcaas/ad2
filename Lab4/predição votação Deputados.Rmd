@@ -17,12 +17,13 @@ library(ggplot2)
 library(plotly)
 library(knitr)
 library(caret)
-
+library(elasticnet)
+library(lars)
 ```
 
 
 ```{r}
-df <- read.csv("C:/Users/João Lucas/Desktop/eleicoes2014.csv",fileEncoding = "latin1")
+df <- read.csv("/home/joaolaf/Área de Trabalho/eleicoes2014.csv",fileEncoding = "latin1")
 colnames(df)[13] <- "recursos_pessoas_fisicas"
 ```
 
@@ -54,14 +55,15 @@ df$recursos_de_pessoas_juridicas[is.na(df$recursos_de_pessoas_juridicas)] <- med
 Para 'tunar' nossas variáveis vamos usar validação cruzada. 'Tuná-las' significa que vamos ter que fazer uma buscar para encontrar os melhores valores para que o teste seja melhor. Como visto no tutorial, existem várias maneiras de se fazer validação cruzada:holdout, k-fold e leave-one-out.
 Para essa questão, ultilizaremos a k-fold nas 3 tunagens.
 
+Nesse processo de tunagem, vamos tirar as variaveis cargo,pelo fato de que essa variável tem poucos fatores, e a variável nome, para não nos atrapalhar no processo, tomando um longo tempo para isso.
 
 RIDGE
 
 ```{r}
-fitControl <- trainControl(method = "repeatedcv", repeats = 10, number = 10)
+fitControl <- trainControl(method = "repeatedcv", repeats = 5, number = 5)
 lambda.grid <- expand.grid(lambda = seq(0, 2, by=0.05))
 
-ridge <- train(votos ~ ., data = df %>% select(-cargo),
+ridge <- train(votos ~ ., data = df %>% select(-cargo) %>% select(-nome),
                method='ridge',
                tuneGrid = lambda.grid,
                trControl = fitControl, 
@@ -73,7 +75,7 @@ ridge
 
 plot(ridge,xlab="Lambda",ylab = "RMSE")
 
-ridge_prediction <= predict(ridge,df)
+ridge_prediction <- predict(ridge,df %>% select(-cargo) %>% select(-nome) %>% select(-votos))
 
 ```
 
@@ -81,7 +83,7 @@ ridge_prediction <= predict(ridge,df)
 LASSO
 
 ```{r}
-lasso <- train(votos~ ., data = df %>% select(-cargo),
+lasso <- train(votos~ ., data = df %>% select(-cargo) %>% select(-nome),
                method='lasso',
                trControl = ctrl, 
                metric='RMSE',
@@ -93,7 +95,7 @@ lasso
 
 
 
-ridge_prediction <= predict(lasso,df %>% select(-cargo) %>% select(-votos))
+ridge_prediction <= predict(lasso,df %>% select(-cargo) %>% select(-nome) %>% select(-votos))
 
 ```
 
@@ -106,7 +108,7 @@ KNN
 trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
 
 
-KNN <- train(votos ~., data = df %>% select(-cargo), 
+KNN <- train(votos ~., data = df %>% select(-cargo) %>% select(-nome), 
              method = "knn",
              trControl=trctrl,
              metric='RMSE',
@@ -118,7 +120,7 @@ KNN
 
 
 
-knnpredict <- predict(KNN, df %>% select(-cargo) %>% select(-votos))
+knnpredict <- predict(KNN, df %>% select(-cargo) %>% select(-nome) %>% select(-votos))
 
 ```
 
