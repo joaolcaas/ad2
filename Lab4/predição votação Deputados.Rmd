@@ -1,0 +1,156 @@
+---
+title: "Predição de votação Deputados"
+author: "João Lucas"
+date: "14 de dezembro de 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(readr)
+library(leaps)
+library(ggplot2)
+library(plotly)
+library(knitr)
+library(caret)
+
+```
+
+
+```{r}
+df <- read.csv("C:/Users/João Lucas/Desktop/eleicoes2014.csv",fileEncoding = "latin1")
+colnames(df)[13] <- "recursos_pessoas_fisicas"
+```
+
+<h3>Para tratar os dados, vamos olhar primeiro as colunas que contém na ao longo dos seus dados. Esses dados são erros na hora de se montar o csv e, por isso, não é de bom uso para nós. Podemos arrumar isso substituindo esses valores NA, setando esses números para a média de cada coluna em que esses valores se encontram.</h3>
+
+```{r}
+
+media_partidos <- mean(df$recursos_de_partidos, na.rm = TRUE)
+df$recursos_de_partidos[is.na(df$recursos_de_partidos)] <- media_partidos
+
+media_comites <- mean(df$recursos_de_outros_candidatos.comites, na.rm = TRUE)
+df$recursos_de_outros_candidatos.comites[is.na(df$recursos_de_outros_candidatos.comites)] <- media_comites
+
+media_proprios <- mean(df$recursos_proprios, na.rm = TRUE)
+df$recursos_proprios[is.na(df$recursos_proprios)] <- media_proprios
+
+media_fisicas <- mean(df$recursos_pessoas_fisicas, na.rm = TRUE)
+df$recursos_pessoas_fisicas[is.na(df$recursos_pessoas_fisicas)] <- media_fisicas
+
+media_juridicas <- mean(df$recursos_de_pessoas_juridicas, na.rm = TRUE)
+df$recursos_de_pessoas_juridicas[is.na(df$recursos_de_pessoas_juridicas)] <- media_juridicas
+
+
+```
+
+
+<h1>Usando todas as variáveis disponíveis, tune (usando validação cruzada): (i) um modelo de regressão Ridge, (ii) um modelo de regressão Lasso e (iii) um modelo KNN. Para os modelos de regressão linear, o parâmetro a ser tunado é o lambda.</h1>
+
+Para 'tunar' nossas variáveis vamos usar validação cruzada. 'Tuná-las' significa que vamos ter que fazer uma buscar para encontrar os melhores valores para que o teste seja melhor. Como visto no tutorial, existem várias maneiras de se fazer validação cruzada:holdout, k-fold e leave-one-out.
+Para essa questão, ultilizaremos a k-fold nas 3 tunagens.
+
+
+RIDGE
+
+```{r}
+fitControl <- trainControl(method = "repeatedcv", repeats = 10, number = 10)
+lambda.grid <- expand.grid(lambda = seq(0, 2, by=0.05))
+
+ridge <- train(votos ~ ., data = df %>% select(-cargo),
+               method='ridge',
+               tuneGrid = lambda.grid,
+               trControl = fitControl, 
+               metric='RMSE',
+               preProcess=c('scale', 'center','nzv')) # nzv para resolver o 0 variance
+
+
+ridge
+
+plot(ridge,xlab="Lambda",ylab = "RMSE")
+
+ridge_prediction <= predict(ridge,df)
+
+```
+
+
+LASSO
+
+```{r}
+lasso <- train(votos~ ., data = df %>% select(-cargo),
+               method='lasso',
+               trControl = ctrl, 
+               metric='RMSE',
+               tuneLength = 100, 
+               preProcess=c('scale', 'center','nvz'))#nvz para resolver o 0 variance 
+               
+
+lasso
+
+
+
+ridge_prediction <= predict(lasso,df %>% select(-cargo) %>% select(-votos))
+
+```
+
+
+
+KNN
+
+```{r}
+
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+
+
+KNN <- train(votos ~., data = df %>% select(-cargo), 
+             method = "knn",
+             trControl=trctrl,
+             metric='RMSE',
+             preProcess = c("center", "scale","nvz"),
+             tuneLength = 10)  
+
+KNN
+
+
+
+
+knnpredict <- predict(KNN, df %>% select(-cargo) %>% select(-votos))
+
+```
+
+<h1>2.Compare os três modelos em termos do erro RMSE de validação cruzada</h1>
+
+Podemos plotar os gráficos dos três modelos em função de seus RMSE e compará-los:
+
+```{r}
+
+plot(KNN,ylab ="RMSE")
+
+plot(lasso,xlab="Lambda",ylab = "RMSE")
+
+plot(ridge,xlab="Lambda",ylab = "RMSE")
+
+```
+
+<h1>3.Quais as variáveis mais importantes segundo o modelo de regressão Ridge e Lasso?  Variáveis foram descartadas pelo Lasso? Quais?</h1>
+
+
+```{r}
+varImp(lasso)
+
+
+```
+
+
+<h1>4.Re-treine o melhor modelo (usando os melhores valores de parâmetros encontrados em todos os dados, sem usar validação cruzada).</h1>
+
+
+
+
+
+
+
