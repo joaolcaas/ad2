@@ -23,7 +23,7 @@ library(lars)
 
 
 ```{r}
-df <- read.csv("/home/joaolaf/Área de Trabalho/eleicoes2014.csv",fileEncoding = "latin1")
+df <- read.csv("C:/Users/João Lucas/Desktop/eleicoes2014.csv",fileEncoding = "latin1")
 colnames(df)[13] <- "recursos_pessoas_fisicas"
 ```
 
@@ -59,9 +59,17 @@ Nesse processo de tunagem, vamos tirar as variaveis cargo,pelo fato de que essa 
 
 RIDGE
 
+
+Ridge regression é um método de regularização que tem como principal objetivo suavizar os atributos que aumentem o ruído no modelo, evitando o overffiting.
+
+Como vamos procurar pelos lambdas, temos que ter a consiência de que:
+    Lambda grande:Bias grande e baixa variância
+    Lambda pequeno: Bias pequeno e alta variância,
+    
+
 ```{r}
 fitControl <- trainControl(method = "repeatedcv", repeats = 5, number = 5)
-lambda.grid <- expand.grid(lambda = seq(0, 2, by=0.05))
+lambda.grid <- expand.grid(lambda = seq(0, 2, by=0.1))
 
 ridge <- train(votos ~ ., data = df %>% select(-cargo) %>% select(-nome),
                method='ridge',
@@ -73,56 +81,102 @@ ridge <- train(votos ~ ., data = df %>% select(-cargo) %>% select(-nome),
 
 ridge
 
-plot(ridge,xlab="Lambda",ylab = "RMSE")
+```
+
+Com o resultado final do lambda = 0 vemos um lambda muito pequeno, ou seja, Bias baixo e variância alta.
+
+
+```{r}
 
 ridge_prediction <- predict(ridge,df %>% select(-cargo) %>% select(-nome) %>% select(-votos))
 
-```
+ridge_data <- data.frame(pred = ridge_prediction, obs = df$votos)
 
+ridge_cv <- round(defaultSummary(ridge_data),digits = 4)
+
+ridge_cv
+
+```
+Em termos de predição no teste, o modelo Ridge tem um R² de 0.4889, nos mostrando que tem um valor maior nos dados de teste do que no de treino.
 
 LASSO
 
+O lasso, que é mais um método de análise de regressão, executa a seleção e regularização de variáveis para aumentar a precisão da predição, podendo selecionar as variáveis para 0 se necessário.
+
 ```{r}
-lasso <- train(votos~ ., data = df %>% select(-cargo) %>% select(-nome),
+lasso <- train(votos ~ ., data = df %>% select(-setor_economico_receita) %>% select(-cargo) %>% select(-nome) %>% select(-setor_economico_despesa),
                method='lasso',
-               trControl = ctrl, 
+               trControl = fitControl, 
                metric='RMSE',
-               tuneLength = 100, 
-               preProcess=c('scale', 'center','nvz'))#nvz para resolver o 0 variance 
+               tuneLength = 50, 
+               preProcess=c('scale', 'center')) 
                
 
 lasso
 
-
-
-ridge_prediction <= predict(lasso,df %>% select(-cargo) %>% select(-nome) %>% select(-votos))
-
 ```
 
+Podemos ver que, no treino, a fração 0 0.1979592 nos mostra onde o R² é melhor, sendo 0.4693216.
+
+
+```{r}
+lasso_prediction <- predict(lasso,df %>% select(-setor_economico_receita) %>% select(-cargo) %>% select(-nome) %>% select(-setor_economico_despesa))
+
+lasso_data <- data.frame(pred = lasso_prediction, obs = df$votos)
+
+lasso_cv<- round(defaultSummary(lasso_data),digits = 4)
+
+lasso_cv
+
+
+```
+E novamente temos que, no treino, o R²(0.5005) é maior do que a o R² no teste. Se compararmos um teste com o outro, vemos que existe uma pequena diferença do lasso com o Ridge.
 
 
 KNN
+
+Para esse modelo de regressão, o nome já dá uma dica boa sobre como o algoritmo funciona. As tunagens do "vizinho proximo" se dará exatamente como o nome fala. O knn vai buscar os elementos que estão mais próximos para dar um match em seus resultados, ou seja, se uma icógnita x está mais perto de y do que de z, ela terá o valor y.
+
+Abaixo, vamos tunar o modelo 15 vezes, tirando do estudo as variáveis CARGO, NOME, SETOR_ECONOMICO_RECEITA E SETOR_ECONOMICO_DESPESA:
 
 ```{r}
 
 trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
 
 
-KNN <- train(votos ~., data = df %>% select(-cargo) %>% select(-nome), 
+knn <- train(votos ~ ., data = df %>% select(-cargo) %>% select(-nome) %>% select(-setor_economico_receita) %>% select(-setor_economico_despesa), 
              method = "knn",
              trControl=trctrl,
              metric='RMSE',
-             preProcess = c("center", "scale","nvz"),
-             tuneLength = 10)  
+             na.action = na.exclude,
+             preProcess = c("center", "scale","nzv"),
+             tuneLength = 15)  
 
-KNN
+knn
 
 
-
-
-knnpredict <- predict(KNN, df %>% select(-cargo) %>% select(-nome) %>% select(-votos))
 
 ```
+
+Fazendo busca pelos vizinhos, uso do knn nos deu K = 21, que nos mostra um RMSE de 31246.24 e um R² de 0.5136776.
+
+
+
+```{r}
+knn_prediction <- predict(knn,df %>% select(-setor_economico_receita) %>% select(-cargo) %>% select(-nome) %>% select(-setor_economico_despesa))
+
+knn_data <- data.frame(pred = knn_prediction, obs = df$votos)
+
+knn_show_cv <- round(defaultSummary(knn_data),digits = 4)
+
+knn_show_cv
+
+
+```
+
+Para os dados de teste, o modelo KNN apresenta o R² de 0.4837, sendo um pouco menor que o resultado do lasso e praticamente igual ao resultado do ridge, mas não mostra nenhuma grande diferença entre os dois modelos usados anteriormente.
+
+
 
 <h1>2.Compare os três modelos em termos do erro RMSE de validação cruzada</h1>
 
@@ -130,13 +184,18 @@ Podemos plotar os gráficos dos três modelos em função de seus RMSE e compar�
 
 ```{r}
 
-plot(KNN,ylab ="RMSE")
+plot(knn,ylab ="RMSE")
 
 plot(lasso,xlab="Lambda",ylab = "RMSE")
 
 plot(ridge,xlab="Lambda",ylab = "RMSE")
 
 ```
+Pelos resultados dos RMES's dos modelos(32368.5680(RIDGE),33020.6592(KNN),32000.5405(LASSO)) podemos observar que o resultado não apresenta nenhuma grande diferença. Apesar de todos serem muito altos, os modelos se equiparam e não parecem mostrar grande diferença entre um e outro.
+
+Também podemos observar nos gráficos que eles se equiparam quase no mesmo ponto(na variável RMSE)
+
+
 
 <h1>3.Quais as variáveis mais importantes segundo o modelo de regressão Ridge e Lasso?  Variáveis foram descartadas pelo Lasso? Quais?</h1>
 
@@ -144,14 +203,94 @@ plot(ridge,xlab="Lambda",ylab = "RMSE")
 ```{r}
 varImp(lasso)
 
-
 ```
+Para total_receita(100) temos um resultado interessante: essa é a variável mais importante do nosso modelo lasso(e muito provavelmente do nosso ridge).
+Vemos que, como no laboratório passado, variáveis que levam em conda arrecadação são as que aparecem no topo da nossa predição.
+O lasso tira 20 de 21 variáveis, deixando de fora variáveis que não afetam muito o nosso estudo no final de tudo(ficamos com 21 variáveis de 23 usadas)
+
+
+
+```{r}
+varImp(ridge)
+```
+
+Enquanto o lasso nos mostra 20 num total de 21, o Ridge mostra 20 de 23, ou seja, leva em consideração mais variáveis do que o lasso. Existe uma pequena diferença quando vemos as variáveis que foram escolhidas entre uma e outra, mas nenhuma das mais significativas foi alterada.
 
 
 <h1>4.Re-treine o melhor modelo (usando os melhores valores de parâmetros encontrados em todos os dados, sem usar validação cruzada).</h1>
 
 
+Levando em consideração o "melhor modelo", como vimos que os resultados são muito similares, vamos usar o lasso sem validação cruzada. 
 
+```{r}
+
+ridge_no_cv <- train(votos ~ ., data = df %>% select(-cargo) %>% select(-nome),
+               method='ridge',
+               tuneGrid = lambda.grid,
+               metric='RMSE',
+               preProcess=c('scale', 'center','nzv')) 
+
+
+ridge_no_cv
+
+
+```
+
+Aqui já temos um lambda maior, mas não muita coisa(o bias continua sendo baixo e a variância alta).
+
+```{r}
+ridge_pred_no_cv <- predict(ridge_no_cv,df %>% select(-cargo) %>% select(-nome) %>% select(-votos))
+
+ridge.data_no_cv <- data.frame(pred = ridge_pred_no_cv, obs = df$votos)
+
+ridge_show_no_cv <- round(defaultSummary(ridge.data_no_cv),digits = 4)
+
+ridge_show_no_cv
+
+```
+
+Como corriqueiro acontecimento no nosso estudo, temos um R² maior nos testes do que no treino.
+Como agora não usamos validação cruzada, podemos ver como se saíram:
+
+*CV:(R²)0.4889*
+
+*NO_CV:(R²)0.4745*
+
+percebemos que, sem a validação cruzada, o R² nos testes foi menor do que com a validação, não sendo a melhor opção no nosso caso.
+
+
+
+<h1>5.Use esse último modelo treinado para prever os dados de teste disponíveis no challenge que criamos na plataforma Kaggle </h1>
+
+
+#temos que arrumar as tabelas para trabalharmos nelas
+```{r}
+testeKaggle <- read.csv("C:/Users/João Lucas/Desktop/test.csv")
+trainKaggle <- read.csv("C:/Users/João Lucas/Desktop/train.csv")
+
+
+ridgeKaggle <- train(votos ~ ., trainKaggle %>% select(-nome) %>% select(-cargo),
+                     method = 'ridge',
+                     tuneGrid = lambda.grid,
+                     metric = "RMSE",
+                     na.action = na.pass,
+                     preProcess = c('scale', 'center','nzv'))
+
+ridgeKaggle
+```
+
+
+
+```{r}
+ridge_kaggle_predict <- predict(redgeKaggle,testeKaggle %>% select(-nome) %>% select(-votos))
+
+ridge.data_kaggle_predict <- data.frame(pred = ridge_kaggle_predict, obs = df$votos)
+
+ridge_show_kaggle_predict <- round(defaultSummary(ridge.data_kaggle_predict),digits = 4)
+
+ridge_show_no_cv
+
+```
 
 
 
