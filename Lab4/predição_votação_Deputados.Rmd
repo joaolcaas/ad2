@@ -218,52 +218,50 @@ varImp(ridge)
 Enquanto o lasso nos mostra 20 num total de 21, o Ridge mostra 20 de 23, ou seja, leva em consideração mais variáveis do que o lasso. Existe uma pequena diferença quando vemos as variáveis que foram escolhidas entre uma e outra, mas nenhuma das mais significativas foi alterada.
 
 
-<h1>4.Re-treine o melhor modelo (usando os melhores valores de parâmetros encontrados em todos os dados, sem usar validação cruzada).</h1>
+<h1>4.Re-treine o melhor modelo (usando os melhores valores de parâmetros encontrados em todos os dados, sem usar validação cruzada).</h1>s
 
 
 Levando em consideração o "melhor modelo", como vimos que os resultados são muito similares, vamos usar o lasso sem validação cruzada. 
 
 ```{r}
 
-ridge_no_cv <- train(votos ~ ., data = df %>% select(-cargo) %>% select(-nome),
-               method='ridge',
-               tuneGrid = lambda.grid,
+lasso_no_cv <- train(votos ~ ., data = df %>% select(-cargo) %>% select(-nome),
+               method='lasso',
                metric='RMSE',
+               tuneLength= 50,
                preProcess=c('scale', 'center','nzv')) 
 
 
-ridge_no_cv
-
+lasso_no_cv
 
 ```
+ Pelo resultado acima, temos um R² menor quando usamos lasso sem cv, sendo o resultado =  0.4306418.
 
-Aqui já temos um lambda maior, mas não muita coisa(o bias continua sendo baixo e a variância alta).
 
 ```{r}
-ridge_pred_no_cv <- predict(ridge_no_cv,df %>% select(-cargo) %>% select(-nome) %>% select(-votos))
+lasso_pred_no_cv <- predict(lasso_no_cv,df %>% select(-cargo) %>% select(-nome) %>% select(-votos))
 
-ridge.data_no_cv <- data.frame(pred = ridge_pred_no_cv, obs = df$votos)
+lasso.data_no_cv <- data.frame(pred = lasso_pred_no_cv, obs = df$votos)
 
-ridge_show_no_cv <- round(defaultSummary(ridge.data_no_cv),digits = 4)
+lasso_show_no_cv <- round(defaultSummary(lasso.data_no_cv),digits = 4)
 
-ridge_show_no_cv
+lasso_show_no_cv
 
 ```
 
 Como corriqueiro acontecimento no nosso estudo, temos um R² maior nos testes do que no treino.
-Como agora não usamos validação cruzada, podemos ver como se saíram:
 
-*CV:(R²)0.4889*
+LASSO R² COM CV = *0.4730139 *
+LASSO R² SEM CV = *0.4306418.*
 
-*NO_CV:(R²)0.4745*
-
-percebemos que, sem a validação cruzada, o R² nos testes foi menor do que com a validação, não sendo a melhor opção no nosso caso.
+vendo isso, chegamos a conclusão de que, no modelo lasso, quando usamos validação cruzada, os resultados aparentam ser melhores
 
 
 
 <h1>5.Use esse último modelo treinado para prever os dados de teste disponíveis no challenge que criamos na plataforma Kaggle </h1>
 
 
+Para essa questão, como temos dois novos data frames para ler, iremos tratar os valores 0 de cada coluna que contenha esse valor, assim como fizemos para o primeiro data frame:
 
 ```{r}
 testeKaggle <- read.csv("C:/Users/João Lucas/Desktop/test.csv")
@@ -288,7 +286,7 @@ media_juridicas_testeKaggle <- mean(testeKaggle$recursos_de_pessoas_juridicas, n
 testeKaggle$recursos_de_pessoas_juridicas[is.na(testeKaggle$recursos_de_pessoas_juridicas)] <- media_juridicas_testeKaggle
 
 
-testeKaggle <-testeKaggle[,-c(6,20)]
+testeKaggle <-testeKaggle[,-c(6,20)]#tirando as colunas do teste
 ```
 
 ```{r}
@@ -312,9 +310,14 @@ trainKaggle$recursos_pessoas_fisicas[is.na(trainKaggle$recursos_pessoas_fisicas)
 media_juridicas_trainKaggle <- mean(trainKaggle$recursos_de_pessoas_juridicas, na.rm = TRUE)
 trainKaggle$recursos_de_pessoas_juridicas[is.na(trainKaggle$recursos_de_pessoas_juridicas)] <- media_juridicas_trainKaggle
 
-trainKaggle <-trainKaggle[,-c(6,21)]
+trainKaggle <-trainKaggle[,-c(6,21)] # tirando as colunas do train
 ```
 
+
+Feito isso, também vamos tirar duas colunas que não ajudam na nossa predição e que dão erro nos comandos que iremos executar mais abaixo
+
+
+Para o nosso teste, iremos usar o lasso(modelo mais usado pela sua rapidez e eficiência, além de seus resultados):
 
 ```{r}
 
@@ -328,6 +331,9 @@ lasso_kaggle <- train(votos ~ ., trainKaggle %>% select(-nome) %>% select(-cargo
 lasso_kaggle
 ```
 
+Na fração dada, o R² para os treino proposto no Kaggle é: 0.4361305. Se compararmos com o modelo da questão 4, veremos que o resultado é bastante próximo um do outro.
+
+Abaixo, iremos usar o predict com os testes do kaggle, gerando um arquivo para ser submetido na competição sugerida pelo professor
 
 
 ```{r}
@@ -339,15 +345,15 @@ write.csv(lasso_kaggle_data,"lasso_kaggle.csv",row.names = F)
 
 exampleJoao_lasso <- read.csv("C:/Users/João Lucas/Documents/ad2/Lab4/lasso_kaggle.csv")
 
-exampleVotos <-abs(exampleJoao_lasso$votos)
+exampleVotos <-abs(exampleJoao_lasso$votos) #ajuste para poder upar o arquivo no kaggle
 
 lasso_kaggle_example <- data.frame(id = testeKaggle$ID, votos = exampleVotos)
 
 write.csv(lasso_kaggle_example,"lasso_kaggle_example.csv",row.names = F)
+
 example_Joao_lasso <- read.csv("C:/Users/João Lucas/Documents/ad2/Lab4/lasso_kaggle_example.csv")
 
 ```
-
 
 
 
