@@ -1,0 +1,159 @@
+---
+title: "Lab2-Minhas Perguntas"
+author: "João Lucas"
+date: "7 de novembro de 2017"
+output: html_document
+---
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(tidyr)
+```
+
+
+```{r}
+df <- read.csv("/home/joaolaf/Área de Trabalho/dadosCEAP.csv")
+colnames(df)[13] <- "val_liquido"
+df$valorGlosa <- as.numeric(sub(",", ".", df$valorGlosa, fixed = TRUE))
+```
+
+
+
+<h2>1.Levando em conta os partidos que mais gastam, quem são os maiores gastadores desses partidos?Com o que mais gastam esses parlamentares?</h2>
+
+*Vamos levar em consideração os 3 partidos que mais gastam. Para isso vamos somar todos os seus valores líquidos, de acordo com cada partido, e mostrar em um gráfico:*
+
+```{r, warning=FALSE}
+b <- df %>% group_by(sgPartido,val_liquido,nomeParlamentar) %>% summarise()
+
+b <- b[!is.na(b$sgPartido),]
+
+b1 <- b %>% group_by(sgPartido) %>% summarise(valorSoma = sum(val_liquido))
+
+b1<- b1[order(b1$valorSoma,decreasing = TRUE),]
+b1<- rbind(head(b1,3))
+
+b1$indexValor <- factor(b1$sgPartido,levels = b1$sgPartido)
+
+p <- plot_ly(b1, x=~indexValor, y=~valorSoma,type='bar',name="Gráfico dos 3 partidos que mais gastam") %>%
+  layout(title = "Partidos por gasto", xaxis = list(title = "Partidos"),yaxis = list(title = "Gasto do partido"),barmode='stack')
+p
+```   
+*Vemos que PT e PMDB tem pouca diferença quanto ao total de seus gastos e aparecem muito próximos no topo do gráfico*
+
+
+*Tendo como informação que PT,PMDB e PSDB são os partido que mais gastam, temos que ver como se comportam os parlamentares que mais gastam em seus respectivos partidos*
+```{r}
+ptParl <- b %>% group_by(nomeParlamentar) %>% filter(sgPartido == "PT") %>%
+  summarise(valorPTParl = sum(val_liquido))
+
+ptParl <- ptParl[order(ptParl$valorPTParl,decreasing = TRUE),]
+ptParl <- rbind(head(ptParl,3))
+ptParl$indexpt <- factor(ptParl$nomeParlamentar,ptParl$nomeParlamentar)
+```
+
+```{r}
+pmdbParl <- b %>% group_by(nomeParlamentar) %>% filter(sgPartido == "PMDB") %>%
+  summarise(valorPMDBParl = sum(val_liquido))
+
+pmdbParl <- pmdbParl[order(pmdbParl$valorPMDBParl,decreasing = TRUE),]
+pmdbParl <- rbind(head(pmdbParl,3))
+pmdbParl$indexpmdb <- factor(pmdbParl$nomeParlamentar,pmdbParl$nomeParlamentar)
+```
+
+```{r}
+psdbParl <- b %>% group_by(nomeParlamentar) %>% filter(sgPartido == "PSDB") %>%
+  summarise(valorPSDBParl = sum(val_liquido))
+
+psdbParl <- psdbParl[order(psdbParl$valorPSDBParl,decreasing = TRUE),]
+psdbParl <- rbind(head(psdbParl,3))
+psdbParl$indexpsdb <- factor(psdbParl$nomeParlamentar,psdbParl$nomeParlamentar)
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+dataPartidos <- data.frame(psdbParl,ptParl,pmdbParl)
+p  <- plot_ly(ptParl,x=~indexpt,y=~valorPTParl,type = 'bar',name = "Mais gastam no PT") %>%
+  add_trace(x=~pmdbParl$indexpmdb,y=~pmdbParl$valorPMDBParl,name= "Mais gastam no PMDB") %>%
+  add_trace(x=~psdbParl$indexpsdb,y=~psdbParl$valorPSDBParl,name="Mais gastam no PSDB") %>%
+  layout(title = "Parlamentares que mais gastam em seus partidos", xaxis = list(title = " "),yaxis = list(title ="Gasto de cada parlamentar"),barmode='stack')
+p
+```
+*Podemos observar que, assim como no gráfico de gasto por partido, no gráfico de gasto por cada parlamentar, os parlamentares do PT e do PMDB também se aproximam.*
+
+<h2>2.Para o tipo de serviço bilhete aéreo, quais são as empresas que mais fornecem esses serviços? Quem mais usa esse tipo de serviço?</h2>
+
+
+*Primeiramente, temos que filtrar todos os serviços, pegando apenas as despesas de bilhete aéreo*
+```{r}
+c <- df %>% group_by(nomeParlamentar,tipoDespesa,fornecedor,val_liquido) %>% 
+  filter(tipoDespesa=="Emissão Bilhete Aéreo") %>% summarise()
+```
+*Agora que já temos os dados prontos, com a despesa especificada, vamos ver quantas vezes cada empresa presta esse serviço*
+
+```{r}
+c1 <- c %>% group_by(fornecedor)  %>%
+  summarise(empresaAp = n())
+
+c1<- c1[order(c1$empresaAp,decreasing = TRUE),]
+c1$indexFornecedor <- factor(c1$fornecedor,levels = c1$fornecedor)
+
+p <- plot_ly(c1, x=~indexFornecedor,y=~empresaAp,type = 'scatter',mode='lines+markers')
+p
+```
+*Podemos analisar a partir desse gráfico que existe uma diferença imensa quanto as empresas que prestam esse tipo de serviço. Enquanto a GOL e a TAM ficam na casa de 80 mil e 90 mil, o resto das fornecedores não passam de 30 mil.*
+
+
+*Já para sabermos os parlamentares que mais usam esse serviço, temos apenas que fazer a mesma coisa acima, só que ao invés do fornecedor, iremos ver pelo nome de cada um que usufrui de tal despesa*
+```{r, warning=FALSE}
+c2 <- c %>% group_by(nomeParlamentar)  %>%
+  summarise(parlamentarAp = n())
+
+c2<- c2[order(c2$parlamentarAp,decreasing = TRUE),]
+c2$indexFornecedor <- factor(c2$nomeParlamentar,levels = c2$nomeParlamentar)
+c2 <- rbind(head(c2,5))
+
+p <- plot_ly(c2,x=~indexFornecedor,y=~parlamentarAp,mode='bar')
+p
+```
+
+*Nesse gráfico, podemos ver que existe um equilíbrio maior. Isso pode indicar que esse tipo de serviço, que é a emissão de bilhetes aéreos, é o mais usado por que é o mais necessário para todos os parlamentares.*
+
+<h2>3.Quem são os maiores prestadores de serviço? Considerando a pergunta para um montante de valor líquido e para quantidade de vezes que aparece na lista</h2>
+
+*Para a lista da CEAP, os fornecedores são aqueles que vão prestar serviço quando os deputados usarem algum tipo de despesa. Como vimos no gráfico acima, um exemplo dessa despesa são os voos. Para fazermos essa pesquisa, vamos mostrar apenas os fornecedores que mais aparecem na lista e os que mais recebem com seus fornecimentos.*
+
+```{r}
+d <- df %>% group_by(fornecedor) %>%
+  summarise(quantasFornece = n(),gastosFornece = sum(val_liquido))
+
+dQuantas <- d[order(d$quantasFornece,decreasing = TRUE),]
+dQuantas <- rbind(head(dQuantas,5))
+dQuantas$indexFornecedorQuantas <- factor(dQuantas$fornecedor,levels = dQuantas$fornecedor)
+
+
+
+p <- plot_ly(dQuantas, x=~indexFornecedorQuantas,y=~quantasFornece,type='bar',name="Fornecedores por Frequancia") %>%
+   layout(title = "Fornecedores por frequencia", xaxis = list(title = "Fornecedores"),yaxis = list(title = "Quantas vezes cada fornecedor aparece"),barmode='stack')
+p
+```
+*Vemos através desse gráfico, que está em ordem decrescente, os tipos de serviços fornecidos que mais aparecem na lista da CEAP. Vemos também uma diferença enorme quanto a pluralidade dos serviços. Entre os 5 mais usados, 4 são franquias de voos aéreos e apenas um defere dos demais(correios).*
+
+
+```{r}
+dQuanto  <- d[order(d$gastosFornece,decreasing = TRUE),]
+dQuanto <- rbind(head(dQuanto,5))
+dQuanto$indexFornecedorQuanto <- factor(dQuanto$fornecedor,levels = dQuanto$fornecedor)
+
+p <- plot_ly(dQuanto, x=~indexFornecedorQuanto,y=~gastosFornece,type='bar',name="Fornecedores por gasto") %>%
+   layout(title = "Fornecedores por gasto", xaxis = list(title = "Fornecedores"),yaxis = list(title = "Gastos líquidos de ada fornecedor na lista da CEAP"),barmode='stack')
+
+p
+
+
+```
+
+*Já no gráfico de gasto, pouco mudou em relação a frequência. Os fornecedores que mais se sobresaem ainda são as companhias aéreas, mas tem uma diferença para o gráfico acima: a companhia AZUL, apesar de aparecer menos na lista da CEAP, recebe mais do que a AVIANCA, empresa que aparece mais vezes na lista. Outra diferença quando falamos de custo e não de frequência, o celular funcional passa a frente dos correios, onde tal nem aparece entre os primeiros na lista de frequência.*
