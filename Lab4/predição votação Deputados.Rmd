@@ -19,6 +19,7 @@ library(knitr)
 library(caret)
 library(elasticnet)
 library(lars)
+library(reshape2)
 ```
 
 
@@ -263,17 +264,60 @@ percebemos que, sem a validação cruzada, o R² nos testes foi menor do que com
 <h1>5.Use esse último modelo treinado para prever os dados de teste disponíveis no challenge que criamos na plataforma Kaggle </h1>
 
 
-#temos que arrumar as tabelas para trabalharmos nelas
+
 ```{r}
 testeKaggle <- read.csv("C:/Users/João Lucas/Desktop/test.csv")
+
+colnames(testeKaggle)[13] <- "recursos_pessoas_fisicas"
+
+media_partidos_testeKaggle <- mean(testeKaggle$recursos_de_partidos, na.rm = TRUE)
+testeKaggle$recursos_de_partidos[is.na(testeKaggle$recursos_de_partidos)] <- media_partidos
+
+media_comites_testeKaggle <- mean(testeKaggle$recursos_de_outros_candidatos.comites, na.rm = TRUE)
+testeKaggle$recursos_de_outros_candidatos.comites[is.na(testeKaggle$recursos_de_outros_candidatos.comites)] <- media_comites
+
+media_proprios_testeKaggle <- mean(testeKaggle$recursos_proprios, na.rm = TRUE)
+testeKaggle$recursos_proprios[is.na(testeKaggle$recursos_proprios)] <- media_proprios
+
+media_fisicas_testeKaggle <- mean(testeKaggle$recursos_pessoas_fisicas, na.rm = TRUE)
+testeKaggle$recursos_pessoas_fisicas[is.na(testeKaggle$recursos_pessoas_fisicas)] <- media_fisicas
+
+media_juridicas <- mean(testeKaggle$recursos_de_pessoas_juridicas, na.rm = TRUE)
+testeKaggle$recursos_de_pessoas_juridicas[is.na(testeKaggle$recursos_de_pessoas_juridicas)] <- media_juridicas
+
+
+testeKaggle <-testeKaggle[,-c(6,20)]
+```
+
+```{r}
 trainKaggle <- read.csv("C:/Users/João Lucas/Desktop/train.csv")
 
 
+colnames(trainKaggle)[13] <- "recursos_pessoas_fisicas"
+
+media_partidos_testeKaggle <- mean(trainKaggle$recursos_de_partidos, na.rm = TRUE)
+trainKaggle$recursos_de_partidos[is.na(trainKaggle$recursos_de_partidos)] <- media_partidos
+
+media_comites_testeKaggle <- mean(trainKaggle$recursos_de_outros_candidatos.comites, na.rm = TRUE)
+trainKaggle$recursos_de_outros_candidatos.comites[is.na(trainKaggle$recursos_de_outros_candidatos.comites)] <- media_comites
+
+media_proprios_testeKaggle <- mean(trainKaggle$recursos_proprios, na.rm = TRUE)
+trainKaggle$recursos_proprios[is.na(trainKaggle$recursos_proprios)] <- media_proprios
+
+media_fisicas_testeKaggle <- mean(trainKaggle$recursos_pessoas_fisicas, na.rm = TRUE)
+trainKaggle$recursos_pessoas_fisicas[is.na(trainKaggle$recursos_pessoas_fisicas)] <- media_fisicas
+
+media_juridicas <- mean(trainKaggle$recursos_de_pessoas_juridicas, na.rm = TRUE)
+trainKaggle$recursos_de_pessoas_juridicas[is.na(trainKaggle$recursos_de_pessoas_juridicas)] <- media_juridicas
+
+trainKaggle <-trainKaggle[,-c(6,21)]
+```
+
+```{r}
 ridgeKaggle <- train(votos ~ ., trainKaggle %>% select(-nome) %>% select(-cargo),
                      method = 'ridge',
                      tuneGrid = lambda.grid,
                      metric = "RMSE",
-                     na.action = na.pass,
                      preProcess = c('scale', 'center','nzv'))
 
 ridgeKaggle
@@ -282,13 +326,13 @@ ridgeKaggle
 
 
 ```{r}
-ridge_kaggle_predict <- predict(redgeKaggle,testeKaggle %>% select(-nome) %>% select(-votos))
+ridge_kaggle_predict <- predict(ridgeKaggle,testeKaggle %>% select(-nome) %>% select(-cargo))
 
-ridge.data_kaggle_predict <- data.frame(pred = ridge_kaggle_predict, obs = df$votos)
+ridge.data_kaggle_predict <- data.frame(pred = ridge_kaggle_predict, obs = trainKaggle$votos)
 
 ridge_show_kaggle_predict <- round(defaultSummary(ridge.data_kaggle_predict),digits = 4)
 
-ridge_show_no_cv
+ridge_show_kaggle_predict
 
 ```
 
