@@ -15,6 +15,7 @@ library(ggplot2)
 library(leaps)
 library(caret)
 library(plotly)
+library(ROSE)
 ```
 
 ```{r}
@@ -45,8 +46,19 @@ df$recursos_de_pessoas_juridicas[is.na(df$recursos_de_pessoas_juridicas)] <- med
 
 ```
 
+##separar dados de treino e teste
+
 ```{r}
-a <- df %>% group_by(situacao_final) %>% 
+dataPartition <- createDataPartition(y = df$situacao_final,p = 0.75,list = FALSE)
+
+treino <- df[dataPartition,]
+teste <- df[-dataPartition,]
+
+```
+
+##onde vamos plotar o grafico
+```{r}
+a <-treino %>% group_by(situacao_final) %>% 
   summarise(totalAparece = n())
 
 a$indexS <- factor(a$situacao_final, levels = a$situacao_final)
@@ -55,9 +67,29 @@ p <- plot_ly(a,x =~indexS,y = ~totalAparece,type = 'bar', name = 'Situações') 
 
 p
 ```
+##podemos falar que, como mostra os dados do treino, os resultados poderiam ser totalmente inviezados
 
 
+##para mudar esses dados, vamos usar o under-simpling
 
+```{r}
+ctrl <- trainControl(method = "repeatedcv", 
+                     number = 10, 
+                     repeats = 10, 
+                     verboseIter = FALSE,
+                     sampling = "down")
+
+data_balanced_under <- ovun.sample(situacao_final ~ ., data = treino, method = "under", N = 40, seed = 1)$data
+table(data_balanced_under$situacao_final)
+
+##model_rf_under <- caret::train(situacao_final ~ .,
+##                         data = treino,
+##                         method = "rf",
+##                         preProcess = c("scale", "center","nzv"),
+##                         trControl = ctrl)
+
+
+```
 
 
   
