@@ -1,0 +1,150 @@
+---
+title: "Predicao Deputados"
+author: "João Lucas"
+date: "26 de fevereiro de 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(ggplot2)
+library(leaps)
+library(caret)
+library(plotly)
+library(C50)
+library(rpart)
+library(rpart.plot)
+library(ROSE)
+```
+
+```{r}
+#para lcc
+#df <- read.csv("/home/joaolaf/Área de Trabalho/train.csv",fileEncoding = "latin1")
+
+#para notebook
+df <- read.csv("C:\\Users\\João Lucas\\Desktop\\train.csv")
+colnames(df)[13] <- "recursos_pessoas_fisicas"
+```
+
+
+<h3>Para tratar os dados, vamos olhar primeiro as colunas que contém na ao longo dos seus dados. Esses dados são erros na hora de se montar o csv e, por isso, não é de bom uso para nós. Podemos arrumar isso substituindo esses valores NA, setando esses números para a média de cada coluna em que esses valores se encontram.</h3>
+
+```{r}
+
+media_partidos <- mean(df$recursos_de_partidos, na.rm = TRUE)
+df$recursos_de_partidos[is.na(df$recursos_de_partidos)] <- media_partidos
+
+media_comites <- mean(df$recursos_de_outros_candidatos.comites, na.rm = TRUE)
+df$recursos_de_outros_candidatos.comites[is.na(df$recursos_de_outros_candidatos.comites)] <- media_comites
+
+media_proprios <- mean(df$recursos_proprios, na.rm = TRUE)
+df$recursos_proprios[is.na(df$recursos_proprios)] <- media_proprios
+
+media_fisicas <- mean(df$recursos_pessoas_fisicas, na.rm = TRUE)
+df$recursos_pessoas_fisicas[is.na(df$recursos_pessoas_fisicas)] <- media_fisicas
+
+media_juridicas <- mean(df$recursos_de_pessoas_juridicas, na.rm = TRUE)
+df$recursos_de_pessoas_juridicas[is.na(df$recursos_de_pessoas_juridicas)] <- media_juridicas
+
+
+```
+
+##separar dados de treino e teste
+
+```{r}
+dataPartition <- createDataPartition(y = df$situacao_final,p = 0.75,list = FALSE)
+
+treino <- df[dataPartition,]
+teste <- df[-dataPartition,]
+
+```
+
+##onde vamos plotar o grafico
+
+<h3>1.Há desbalanceamento das classes (isto é, uma classe tem muito mais instâncias que outra)? Em que proporção? Quais efeitos colaterais o desbalanceamento de classes pode causar no classificador? </h3>
+```{r}
+a <-treino %>% group_by(situacao_final) %>% 
+  summarise(totalAparece = n())
+
+a$indexS <- factor(a$situacao_final, levels = a$situacao_final)
+
+p <- plot_ly(a,x =~indexS,y = ~totalAparece,type = 'bar', name = 'Situações') %>% layout(title = 'Frequência de cada situação',xaxis = list(title=""),yaxis = list(title = "Quantas vezes cada situação aparece"),barmode = 'stack')
+
+p
+```
+##podemos falar que, como mostra os dados do treino, os resultados poderiam ser totalmente inviezados
+##para mudar esses dados, vamos usar o under-simpling
+
+<h3>2.Treine: um modelo de regressão logística, uma árvore de decisão e um modelo de adaboost. Tune esses modelos usando validação cruzada e controle overfitting se necessário, considerando as particularidades de cada modelo.</h3>
+
+##Esse será o método que iremos usar para simplificar os dados
+```{r}
+ctrl <- trainControl(method = "repeatedcv", 
+                     number = 10, 
+                     repeats = 10, 
+                     verboseIter = FALSE,
+                     sampling = "down")
+
+```
+
+##regressão logistica
+```{r}
+regressaoLogistica <- train(situacao_final ~ .,
+                 data = treino,
+                 method="glm",
+                 trControl = ctrl, 
+                 family="binomial",      # se a variável for binária
+                 na.action = na.omit)
+
+regressaoLogistica
+
+```
+
+
+##arvore de decisão
+##sem tirar os dados a mais
+
+```{r}
+control <- rpart.control(maxdepth=20,minsplit=20,cp=0.001)
+
+arvore <- rpart(situacao_final ~ ., data = treino %>% select(-nome), control = control)
+prp(arvore)
+
+```
+##tirando os dados a mais
+
+```{r}
+arvore1 <- train(situacao_final ~.,data=treino, 
+                 method = "rpart",
+                 trControl = ctrl,
+                 cp=0.001,  # parâmetro de complexidade
+                 maxdepth=20)
+arvore1
+```
+##usando adboost
+
+```{r}
+modelo <- train(formula,data=treino,
+                trControl = ctrl,
+                method = "adaboost")
+
+modelo
+```
+
+
+##dados que vou usar para plotar os dados
+```{r}
+data.balanced.over <- ovun.sample(situacao_final~., data=treino,p=0.5, seed=1,method="both")$data
+
+table(data.balanced.over$situacao_final)
+```
+
+
+<h3>3.Reporte acurácia, precision, recall e f-measure no treino e validação. Como você avalia os resultados? Justifique sua resposta.</h3>
+
+<h3>4.Interprete as saídas dos modelos. Quais atributos parecem ser mais importantes de acordo com cada modelo? Crie pelo menos um novo atributo que não está nos dados originais e estude o impacto desse atributo</h3>  
+  
