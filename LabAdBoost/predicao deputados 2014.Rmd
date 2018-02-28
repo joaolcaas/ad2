@@ -15,7 +15,7 @@ library(ggplot2)
 library(leaps)
 library(caret)
 library(plotly)
-library(C50)
+#library(C50)
 library(rpart)
 library(rpart.plot)
 library(ROSE)
@@ -23,10 +23,10 @@ library(ROSE)
 
 ```{r}
 #para lcc
-#df <- read.csv("/home/joaolaf/Área de Trabalho/train.csv",fileEncoding = "latin1")
+df <- read.csv("/home/joaolaf/Área de Trabalho/train.csv",fileEncoding = "latin1")
 
 #para notebook
-df <- read.csv("C:\\Users\\João Lucas\\Desktop\\train.csv")
+#df <- read.csv("C:\\Users\\João Lucas\\Desktop\\train.csv")
 colnames(df)[13] <- "recursos_pessoas_fisicas"
 ```
 
@@ -79,6 +79,14 @@ p
 ##podemos falar que, como mostra os dados do treino, os resultados poderiam ser totalmente inviezados
 ##para mudar esses dados, vamos usar o under-simpling
 
+##dados que vou usar para plotar os dados
+```{r}
+treino_balanced <- ovun.sample(situacao_final~., data=treino,p=0.5, seed=1,method="both")$data
+
+table(treino_balanced$situacao_final)
+
+```
+
 <h3>2.Treine: um modelo de regressão logística, uma árvore de decisão e um modelo de adaboost. Tune esses modelos usando validação cruzada e controle overfitting se necessário, considerando as particularidades de cada modelo.</h3>
 
 ##Esse será o método que iremos usar para simplificar os dados
@@ -86,15 +94,15 @@ p
 ctrl <- trainControl(method = "repeatedcv", 
                      number = 10, 
                      repeats = 10, 
-                     verboseIter = FALSE,
-                     sampling = "down")
+                     verboseIter = FALSE)
 
+formula = as.formula(situacao_final ~ .)
 ```
 
 ##regressão logistica
 ```{r}
-regressaoLogistica <- train(situacao_final ~ .,
-                 data = treino,
+regressaoLogistica <- train(formula,
+                 data = treino_balanced,
                  method="glm",
                  trControl = ctrl, 
                  family="binomial",      # se a variável for binária
@@ -111,14 +119,14 @@ regressaoLogistica
 ```{r}
 control <- rpart.control(maxdepth=20,minsplit=20,cp=0.001)
 
-arvore <- rpart(situacao_final ~ ., data = treino %>% select(-nome), control = control)
+arvore <- rpart(formula, data = treino_balanced %>% select(-nome), control = control)
 prp(arvore)
 
 ```
 ##tirando os dados a mais
 
 ```{r}
-arvore1 <- train(situacao_final ~.,data=treino, 
+arvore1 <- train(formula,data=treino, 
                  method = "rpart",
                  trControl = ctrl,
                  cp=0.001,  # parâmetro de complexidade
@@ -136,12 +144,7 @@ modelo
 ```
 
 
-##dados que vou usar para plotar os dados
-```{r}
-data.balanced.over <- ovun.sample(situacao_final~., data=treino,p=0.5, seed=1,method="both")$data
 
-table(data.balanced.over$situacao_final)
-```
 
 
 <h3>3.Reporte acurácia, precision, recall e f-measure no treino e validação. Como você avalia os resultados? Justifique sua resposta.</h3>
