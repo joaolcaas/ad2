@@ -23,35 +23,13 @@ library(ROSE)
 
 ```{r}
 #para lcc
-df <- read.csv("/home/joaolaf/Área de Trabalho/train.csv",fileEncoding = "latin1")
+df <- read.csv("/home/joaolaf/Área de Trabalho/train.csv",encoding = "utf-8")
 
 #para notebook
 #df <- read.csv("C:\\Users\\João Lucas\\Desktop\\train.csv")
 colnames(df)[13] <- "recursos_pessoas_fisicas"
 ```
 
-
-<h3>Para tratar os dados, vamos olhar primeiro as colunas que contém na ao longo dos seus dados. Esses dados são erros na hora de se montar o csv e, por isso, não é de bom uso para nós. Podemos arrumar isso substituindo esses valores NA, setando esses números para a média de cada coluna em que esses valores se encontram.</h3>
-
-```{r}
-
-media_partidos <- mean(df$recursos_de_partidos, na.rm = TRUE)
-df$recursos_de_partidos[is.na(df$recursos_de_partidos)] <- media_partidos
-
-media_comites <- mean(df$recursos_de_outros_candidatos.comites, na.rm = TRUE)
-df$recursos_de_outros_candidatos.comites[is.na(df$recursos_de_outros_candidatos.comites)] <- media_comites
-
-media_proprios <- mean(df$recursos_proprios, na.rm = TRUE)
-df$recursos_proprios[is.na(df$recursos_proprios)] <- media_proprios
-
-media_fisicas <- mean(df$recursos_pessoas_fisicas, na.rm = TRUE)
-df$recursos_pessoas_fisicas[is.na(df$recursos_pessoas_fisicas)] <- media_fisicas
-
-media_juridicas <- mean(df$recursos_de_pessoas_juridicas, na.rm = TRUE)
-df$recursos_de_pessoas_juridicas[is.na(df$recursos_de_pessoas_juridicas)] <- media_juridicas
-
-
-```
 
 ##separar dados de treino e teste
 
@@ -87,21 +65,38 @@ table(treino_balanced$situacao_final)
 
 ```
 
+```{r}
+b <-treino_balanced %>% group_by(situacao_final) %>% 
+  summarise(totalApareceBalanced = n())
+
+b$indexS <- factor(b$situacao_final, levels = b$situacao_final)
+
+p_balanced <- plot_ly(b,x =~indexS,y = ~totalApareceBalanced,type = 'bar', name = 'Situações') %>% layout(title = 'Frequência de cada situação',xaxis = list(title=""),yaxis = list(title = "Quantas vezes cada situação aparece"),barmode = 'stack')
+
+p_balanced
+
+```
+
 <h3>2.Treine: um modelo de regressão logística, uma árvore de decisão e um modelo de adaboost. Tune esses modelos usando validação cruzada e controle overfitting se necessário, considerando as particularidades de cada modelo.</h3>
 
-##Esse será o método que iremos usar para simplificar os dados
+
+
+Para a nossa fórmula, iremos usar os dados que tiveram melhor eficácia quando tentamos predizer o número de votos (lab 3 da disciplina de ad2 -> https://rpubs.com/joaolcaas/predicao_2014_ad2)
+
 ```{r}
 ctrl <- trainControl(method = "repeatedcv", 
                      number = 10, 
                      repeats = 10, 
                      verboseIter = FALSE)
 
-formula = as.formula(situacao_final ~ .)
+formula.votos = as.formula(situacao_final ~  total_receita + total_despesa + quantidade_despesas + recursos_de_pessoas_juridicas + recursos_de_partidos + quantidade_doacoes + quantidade_fornecedores + media_receita + quantidade_doadores)
 ```
 
-##regressão logistica
+
+Para testar a nossa fórmula, vamos usar a regressão logística.(FALAR SOBRE A REGRESSÃO)
+
 ```{r}
-regressaoLogistica <- train(formula,
+regressaoLogistica <- train(formula.votos,
                  data = treino_balanced,
                  method="glm",
                  trControl = ctrl, 
@@ -110,44 +105,69 @@ regressaoLogistica <- train(formula,
 
 regressaoLogistica
 
+varImp(regressaoLogistica)
+
 ```
 
+Pela nossa regressão logistica, vimos que os dados mais altos na votacao(como total_receita, que tinha 100 de importancia) desceram bastante e não são mais o mesmo.Além disso podemos ver o valor da Acurácia, que é de 0.8841712. Essa é uma métrica importante quando estamos falando sobre regressão logística(FALAR SOBRE ACURÁCIA). 
+
+Vamos usar outra formula, adicionando novos atributos, deixando apenas as variáveis mais importantes segundo a regressão logistica
+
+```{r}
+
+formula.situacao.final = as.formula(situacao_final ~ media_receita + quantidade_doacoes + recursos_de_partidos + descricao_cor_raca + despesa_max_campanha + sexo + grau)
+
+
+regressaoLogisticaNovaFormula <- train(formula.situacao.final,
+                 data = treino_balanced,
+                 method="glm",
+                 trControl = ctrl, 
+                 family="binomial",      # se a variável for binária
+                 na.action = na.omit)
+
+regressaoLogisticaNovaFormula
+
+```
+Para a nova fórmula, vemos que a Acurácia teve uma pequena melhora, mesmo estando com 7 preditores.
 
 ##arvore de decisão
-##sem tirar os dados a mais
 
 ```{r}
 control <- rpart.control(maxdepth=20,minsplit=20,cp=0.001)
-
-arvore <- rpart(formula, data = treino_balanced %>% select(-nome), control = control)
+  
+arvore <- rpart(formula.situacao.final, data = treino_balanced, control = control)
 prp(arvore)
 
 ```
-##tirando os dados a mais
+
 
 ```{r}
-arvore1 <- train(formula,data=treino, 
-                 method = "rpart",
-                 trControl = ctrl,
-                 cp=0.001,  # parâmetro de complexidade
-                 maxdepth=20)
+
+arvore1 <- train(formula.situacao.final,
+                data= treino_balanced, method = "rpart",
+                trControl = ctrl,
+                cp=0.001,  # parâmetro de complexidade
+                maxdepth=20)
 arvore1
 ```
+
+Como o algoritmo seleciona a melhor Acurácia, o valor do cp retornado é de cp = 0.03765972, que vai nos levar a uma acurácia de 0.8869805, sendo um pouco menor do que a da regressão logística (aproximadamente 0.89). Isso pode ter se dado ao fato de que temos duas variáveis a menos aqui, em relação a fórmula da regressão logística. 
+
 ##usando adboost
 
+Para o AdaBoost, vamos usar a fórmula que melhor se expressou na refressão logistica
 ```{r}
-modelo <- train(formula,data=treino,
+modelo <- train(formula.situacao.final,
+                data=treino_balanced,
                 trControl = ctrl,
                 method = "adaboost")
 
 modelo
 ```
 
-
-
-
-
 <h3>3.Reporte acurácia, precision, recall e f-measure no treino e validação. Como você avalia os resultados? Justifique sua resposta.</h3>
+
+
 
 <h3>4.Interprete as saídas dos modelos. Quais atributos parecem ser mais importantes de acordo com cada modelo? Crie pelo menos um novo atributo que não está nos dados originais e estude o impacto desse atributo</h3>  
   
