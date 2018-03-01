@@ -23,10 +23,10 @@ library(ROSE)
 
 ```{r}
 #para lcc
-#df <- read.csv("/home/joaolaf/Área de Trabalho/train.csv",encoding = "utf-8")
+df <- read.csv("/home/joaolaf/Área de Trabalho/train.csv",encoding = "utf-8")
 
 #para notebook
-df <- read.csv("C:\\Users\\João Lucas\\Desktop\\train.csv",encoding = "utf-8")
+#df <- read.csv("C:\\Users\\João Lucas\\Desktop\\train.csv",encoding = "utf-8")
 colnames(df)[13] <- "recursos_pessoas_fisicas"
 ```
 
@@ -137,20 +137,11 @@ regressaoLogisticaNovaFormula <- train(formula.situacao.final,
 regressaoLogisticaNovaFormula
 
 ```
-  Para a nova fórmula, vemos que a Acurácia teve uma pequena melhora, mesmo estando com 7 preditores.
+  Para a nova fórmula, vemos que a Acurácia não se manifestou de forma muito diferente. Sendo assim, vamos continuar usando a fórmula que usa os parâmetros do lab anterior.
 
   <h2>Árvore de decisão</h2>
   
   Particionando a "árvore", esse modelo gera resultados a partir de parâmetros que demostram se o valor de tal parâmetro leva a um resultado positivo ou negativo. 
-  
-```{r}
-control <- rpart.control(maxdepth=20,minsplit=20,cp=0.001)
-  
-arvore <- rpart(formula.situacao.final, data = treino_balanced, control = control)
-prp(arvore)
-
-```
-
 
 ```{r}
 
@@ -162,14 +153,19 @@ arvore1 <- train(formula.votos,
 arvore1
 ```
 
-Como o algoritmo seleciona a melhor Acurácia, o valor do cp retornado é de cp = 0.03765972, que vai nos levar a uma acurácia de 0.8869805, sendo um pouco menor do que a da regressão logística (aproximadamente 0.89). Isso pode ter se dado ao fato de que temos duas variáveis a menos aqui, em relação a fórmula da regressão logística. 
-
+Como o algoritmo seleciona a melhor Acurácia, o valor do do melhor modelo usado é o de cp = 0.004 aproximadamente. Esse modelo nos retornou uma acurácia melhor do que a regressão logística, indicando que os valores podem ser melhor classificados.
+  
   <h2>Adaboost</h2>
   
   Assim como as outras técnicas, adaboost vai nos ajudar a predizer quem será eleito, porém, com mais poder, tendo em vista que, a técnica estuda a predição e aumenta os pesos das variáveis que são de mais importância.
   
+  Como essa é uma técnica que demanda tempo para ser executada, vamos diminuir o tamanho da formula para o treino.
+  
 ```{r}
-adaboost <- train(formula.situacao.final,
+formula.adaboost = as.formula(situacao_final ~ media_receita + quantidade_doacoes + recursos_de_partidos)
+
+
+adaboost <- train(formula.adaboost,
                 data=treino_balanced,
                 trControl = ctrl,
                 method = "adaboost")
@@ -179,70 +175,225 @@ adaboost
 
 <h3>3.Reporte acurácia, precision, recall e f-measure no treino e validação. Como você avalia os resultados? Justifique sua resposta.</h3>
   
-  <h2>No treino </h2>
+  Como já vimos, acurácia é a proporção de observações corretamente classificadas.
+  
+  Precision é a porcentagem daqueles de "acerto", ou seja, daqueles que o modelo classificou como certo, quantos realmente eram?
+  Recall é a frequência em que o classificador encontra os exemplos de uma classe, ou seja, quanto da classe Y realmente é Y?
+  Já o f-measure é a média ponderada da precision e do recall, levando em conta falsos positivos e falsos negativos, sendo o balanço entre esses dois valores.
+  
+
+  <h3>No teste</h3>
+  
+  Primeiro, vamos encontrar os valores para o teste, passando por cada algoritmo.
+  
+  <h2>Regressão Logística</h2>
 ```{r}
 
-treino$predicao.alguma coisa <- predict(regressaoLogisticaNovaFormula, treino_balanced$situacao_final)
+teste$predicao.reg <- predict(regressaoLogistica, teste)
 
-TP <- teste %>% filter(Class == "eleito", predicao == "eleito") %>% nrow()
-TN <- teste %>% filter(Class == "nao_eleito" , predicao == "nao_eleito" ) %>% nrow()
-FP <- teste %>% filter(Class == "nao_eleito" , predicao == "eleito") %>% nrow()
-FN <- teste %>% filter(Class == "eleito", predicao == "nao_eleito" ) %>% nrow()
+TP.teste.reg <- teste %>% filter(situacao_final == "eleito", predicao.reg== "eleito") %>% nrow()
+TN.teste.reg <- teste %>% filter(situacao_final == "nao_eleito" , predicao.reg == "nao_eleito" ) %>% nrow()
+FP.teste.reg <- teste %>% filter(situacao_final == "nao_eleito" , predicao.reg == "eleito") %>% nrow()
+FN.teste.reg <- teste %>% filter(situacao_final == "eleito", predicao.reg == "nao_eleito" ) %>% nrow()
 
-accuracy <- (TP + TN)/(TP + TN + FP + FN)
-precision <- TP / (TP + FP)
-recall <- TP / (TP + FN)
-Fmeasure <- 2*(recall*precision)/(recall+precision)
+accuracy.teste.reg <- (TP.teste.reg + TN.teste.reg)/(TP.teste.reg + TN.teste.reg + FP.teste.reg + FN.teste.reg)
+precision.teste.reg <- TP.teste.reg / (TP.teste.reg + FP.teste.reg)
+recall.teste.reg <- TP.teste.reg / (TP.teste.reg + FN.teste.reg)
+Fmeasure.teste.reg <- 2*(recall.teste.reg*precision.teste.reg)/(recall.teste.reg+precision.teste.reg)
 
-accuracy
-precision
-recall
-Fmeasure
-
-```
-  <h2>No teste</h2>
-```{r}
-teste$predicao.algumacoisa <- predict(regressaoLogisticaNovaFormula, teste$situacao_final)
-
-TP <- teste %>% filter(Class == "eleito", predicao == "eleito") %>% nrow()
-TN <- teste %>% filter(Class == "nao_eleito" , predicao == "nao_eleito" ) %>% nrow()
-FP <- teste %>% filter(Class == "nao_eleito" , predicao == "eleito") %>% nrow()
-FN <- teste %>% filter(Class == "eleito", predicao == "nao_eleito" ) %>% nrow()
-
-accuracy <- (TP + TN)/(TP + TN + FP + FN)
-precision <- TP / (TP + FP)
-recall <- TP / (TP + FN)
-Fmeasure <- 2*(recall*precision)/(recall+precision)
-
-accuracy
-precision
-recall
-Fmeasure
+accuracy.teste.reg
+precision.teste.reg
+recall.teste.reg
+Fmeasure.teste.reg
 
 ```
   
+  
+  <h2>Arvore</h2>
+  
+  
+```{r}
+teste$predicao.arvore <- predict(arvore1, teste)
 
-<h3>4.Interprete as saídas dos modelos. Quais atributos parecem ser mais importantes de acordo com cada modelo? Crie pelo menos um novo atributo que não está nos dados originais e estude o impacto desse atributo</h3>  
+TP.teste.arvore <- teste %>% filter(situacao_final == "eleito", predicao.arvore== "eleito") %>% nrow()
+TN.teste.arvore <- teste %>% filter(situacao_final == "nao_eleito" , predicao.arvore == "nao_eleito" ) %>% nrow()
+FP.teste.arvore <- teste %>% filter(situacao_final == "nao_eleito" , predicao.arvore == "eleito") %>% nrow()
+FN.teste.arvore <- teste %>% filter(situacao_final == "eleito", predicao.arvore == "nao_eleito" ) %>% nrow()
+
+accuracy.teste.arvore <- (TP.teste.arvore + TN.teste.arvore)/(TP.teste.arvore + TN.teste.arvore + FP.teste.arvore+ FN.teste.arvore)
+precision.teste.arvore <- TP.teste.arvore / (TP.teste.arvore + FP.teste.arvore)
+recall.teste.arvore <- TP.teste.arvore / (TP.teste.arvore + FN.teste.arvore)
+Fmeasure.teste.arvore <- 2*(recall.teste.arvore*precision.teste.arvore)/(recall.teste.arvore+precision.teste.arvore)
+
+accuracy.teste.arvore
+precision.teste.arvore
+recall.teste.arvore
+Fmeasure.teste.arvore
+
+```
+<h2>Adaboost</h2>
+
+```{r}
+teste$predicao.adaboost<- predict(adaboost, teste)
+
+TP.teste.adaboost <- teste %>% filter(situacao_final == "eleito", predicao.adaboost == "eleito") %>% nrow()
+TN.teste.adaboost <- teste %>% filter(situacao_final == "nao_eleito" , predicao.adaboost == "nao_eleito" ) %>% nrow()
+FP.teste.adaboost <- teste %>% filter(situacao_final == "nao_eleito" , predicao.adaboost == "eleito") %>% nrow()
+FN.teste.adaboost <- teste %>% filter(situacao_final == "eleito", predicao.adaboost == "nao_eleito" ) %>% nrow()
+
+accuracy.teste.adaboost <- (TP.teste.adaboost + TN.teste.adaboost)/(TP.teste.adaboost + TN.teste.adaboost + FP.teste.adaboost + FN.teste.adaboost)
+precision.teste.adaboost <- TP.teste.adaboost / (TP.teste.adaboost + FP.teste.adaboost)
+recall.teste.adaboost <- TP.teste.adaboost / (TP.teste.adaboost + FN.teste.adaboost)
+Fmeasure.teste.adaboost <- 2*(recall.teste.adaboost*precision.teste.adaboost)/(recall.teste.adaboost+precision.teste.adaboost)
+
+accuracy.teste.adaboost
+precision.teste.adaboost
+recall.teste.adaboost
+Fmeasure.teste.adaboost
+
+```
+
+
+  <h3>No treino</h3>
   <h2>Regressão logística</h2>
+  
+```{r}
+
+treino$predicao.reg<- predict(regressaoLogistica, treino)
+
+TP.treino.reg <- treino %>% filter(situacao_final == "eleito", predicao.reg == "eleito") %>% nrow()
+TN.treino.reg <- treino %>% filter(situacao_final == "nao_eleito" , predicao.reg == "nao_eleito" ) %>% nrow()
+FP.treino.reg <- treino %>% filter(situacao_final == "nao_eleito" , predicao.reg == "eleito") %>% nrow()
+FN.treino.reg <- treino %>% filter(situacao_final == "eleito", predicao.reg == "nao_eleito" ) %>% nrow()
+
+accuracy.treino.reg <- (TP.treino.reg + TN.treino.reg)/(TP.treino.reg + TN.treino.reg + FP.treino.reg + FN.treino.reg)
+precision.treino.reg <- TP.treino.reg / (TP.treino.reg + FP.treino.reg)
+recall.treino.reg <- TP.treino.reg / (TP.treino.reg + FN.treino.reg)
+Fmeasure.treino.reg <- 2*(recall.treino.reg*precision.treino.reg)/(recall.treino.reg+precision.treino.reg)
+
+accuracy.treino.reg
+precision.treino.reg
+recall.treino.reg
+Fmeasure.treino.reg
+```
+  
+  <h2>Árvore</h2>
+  
+    
+```{r}
+treino$predicao.arvore<- predict(arvore1, treino)
+
+TP.predicao.arvore <- treino %>% filter(situacao_final == "eleito", predicao.arvore == "eleito") %>% nrow()
+TN.predicao.arvore <- treino %>% filter(situacao_final == "nao_eleito" , predicao.arvore == "nao_eleito" ) %>% nrow()
+FP.predicao.arvore <- treino %>% filter(situacao_final == "nao_eleito" , predicao.arvore == "eleito") %>% nrow()
+FN.predicao.arvore <- treino %>% filter(situacao_final == "eleito", predicao.arvore == "nao_eleito" ) %>% nrow()
+
+accuracy.predicao.arvore <- (TP.predicao.arvore + TN.predicao.arvore)/(TP.predicao.arvore + TN.predicao.arvore + FP.predicao.arvore + FN.predicao.arvore)
+precision.predicao.arvore <- TP.predicao.arvore / (TP.predicao.arvore + FP.predicao.arvore)
+recall.predicao.arvore <- TP.predicao.arvore / (TP.predicao.arvore + FN.predicao.arvore)
+Fmeasure.predicao.arvore <- 2*(recall.predicao.arvore*precision.predicao.arvore)/(recall.predicao.arvore+precision.predicao.arvore)
+
+accuracy.predicao.arvore
+precision.predicao.arvore
+recall.predicao.arvore
+Fmeasure.predicao.arvore
+
+```
+  
+  <h2> Adaboost</h2>
+```{r}
+treino$predicao.adaboost<- predict(adaboost, treino)
+
+TP.predicao.adaboost <- treino %>% filter(situacao_final == "eleito", predicao.adaboost == "eleito") %>% nrow()
+TN.predicao.adaboost <- treino %>% filter(situacao_final == "nao_eleito" , predicao.adaboost == "nao_eleito" ) %>% nrow()
+FP.predicao.adaboost <- treino %>% filter(situacao_final == "nao_eleito" , predicao.adaboost == "eleito") %>% nrow()
+FN.predicao.adaboost <- treino %>% filter(situacao_final == "eleito", predicao.adaboost == "nao_eleito" ) %>% nrow()
+
+accuracy.predicao.adaboost <- (TP.predicao.adaboost + TN.predicao.adaboost)/(TP.predicao.adaboost + TN.predicao.adaboost + FP.predicao.adaboost + FN.predicao.adaboost)
+precision.predicao.adaboost <- TP.predicao.adaboost / (TP.predicao.adaboost + FP.predicao.adaboost)
+recall.predicao.adaboost <- TP.predicao.adaboost / (TP.predicao.adaboost + FN.predicao.adaboost)
+Fmeasure.predicao.adaboost <- 2*(recall.predicao.adaboost*precision.predicao.adaboost)/(recall.predicao.adaboost+precision.predicao.adaboost)
+
+accuracy.predicao.adaboost
+precision.predicao.adaboost
+recall.predicao.adaboost
+Fmeasure.predicao.adaboost
+```
+
+  
+  <h3>4.Interprete as saídas dos modelos. Quais atributos parecem ser mais importantes de acordo com cada modelo? Crie pelo menos um novo atributo que não está nos dados originais e estude o impacto desse atributo</h3>  
+  
 ```{r}
 varImp(regressaoLogistica)
 ```
+  Mostrando as variáveis mais importantes através do varImp, a regressão logística aponta o que já tínhamos visto na questão 2. A variável media_receita é de extrema importância para esse processo de predição.
+  
   <h2>Arvore</h2>
 ```{r}
 varImp(arvore1)
 ```
+  Já na árvore, como foi no nosso lab anterior(), a variável total_receita apresenta 100 de importância. Já media_receita, que foi a melhor variável no modelo acima, mostra que é uma variável importante aqui também, apresentando resultado de aproximadamente 75.
+  Porém, total_receita não mostra nenhuma importância na estratégia de regressão logística.
   
   <h2>Adaboost</h2>
 ```{r}
 varImp(adaboost)
 ```
+  
   <h2>Para criar uma nova variável</h2>
+  
+  Para essa nova variável, vamos testá-la no modelo que mostrou melhor resultado em todo o nosso estudo, regressão logística.
+  Como sabemos, regressão logística teve como variável mais importante media_receita. Como queremos novas variáveis, vamos elevar essa ao quadrado, assim como a variável que apresentou segundo melhor resultado, que foi quantidade_doadores. 
 ```{r}
 
+formula.nova.variavel = as.formula(situacao_final ~ poly(media_receita,2)  + poly(quantidade_doadores,2) + total_receita + total_despesa + quantidade_despesas + recursos_de_pessoas_juridicas + recursos_de_partidos + quantidade_doacoes + quantidade_fornecedores)
+
+
+regressaoLogisticaNovaVariavel <- train(formula.nova.variavel,
+                 data = treino_balanced,
+                 method="glm",
+                 trControl = ctrl, 
+                 family="binomial",      # se a variável for binária
+                 na.action = na.omit)
+
+regressaoLogisticaNovaVariavel
+
+
+
+
+
 ```
-  
+    Nao mostrou tanta diferença.
+
+
   
 <h3>Enviando o melhor modelo para o kaggle</h3>
+
+
+  TEM QUE ENVIAR ID + SITUACAO_FINAL
+```{r}
+#para lcc
+testeKaggle <- read.csv("/home/joaolaf/Área de Trabalho/test.csv",encoding = "utf-8")
+
+#para notebook
+#df <- read.csv("C:\\Users\\João Lucas\\Desktop\\train.csv",encoding = "utf-8")
+colnames(testeKaggle)[13] <- "recursos_pessoas_fisicas"
+
+
+regressaoLogistica.kaggle <- train(formula.votos,    #ver qual a melhor formula
+                 data = treino_balanced,
+                 method="glm",
+                 trControl = ctrl, 
+                 family="binomial",      # se a variável for binária
+                 na.action = na.omit)
+
+reg.final.kaggle <- predict(regressaoLogistica.kaggle,testeKaggle %>% select(-ID))
+kaggle.final <- data.frame(ID = testeKaggle$ID, prediction = reg.final.kaggle)
+write.csv(kaggle.final,"teste.csv",row.names = F)
+
+
+
+```
 
 
 
