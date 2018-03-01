@@ -23,15 +23,15 @@ library(ROSE)
 
 ```{r}
 #para lcc
-df <- read.csv("/home/joaolaf/Área de Trabalho/train.csv",encoding = "utf-8")
+#df <- read.csv("/home/joaolaf/Área de Trabalho/train.csv",encoding = "utf-8")
 
 #para notebook
-#df <- read.csv("C:\\Users\\João Lucas\\Desktop\\train.csv")
+df <- read.csv("C:\\Users\\João Lucas\\Desktop\\train.csv",encoding = "utf-8")
 colnames(df)[13] <- "recursos_pessoas_fisicas"
 ```
 
 
-##separar dados de treino e teste
+<h3>Nesse lab da disciplina de ad2, queremos prever quais serão os candidatos que serão eleitos na próxima eleição a partir dos dados da eleição de 2014. Para começarmos a predição, vamos primeiro dividir o nosso frame em treino e teste, deixando uma porcentagem de 75% para o treino.</h3>
 
 ```{r}
 dataPartition <- createDataPartition(y = df$situacao_final,p = 0.75,list = FALSE)
@@ -41,9 +41,10 @@ teste <- df[-dataPartition,]
 
 ```
 
-##onde vamos plotar o grafico
-
 <h3>1.Há desbalanceamento das classes (isto é, uma classe tem muito mais instâncias que outra)? Em que proporção? Quais efeitos colaterais o desbalanceamento de classes pode causar no classificador? </h3>
+
+  Como queremos saber se os candidatos serão eleitos ou não, vamos fazer a predição com base na situação final de cada candidato na eleição de 2014. No gráfico abaixo, podemos ver que existe uma grande diferença entre a situação eleita e a não eleita.
+  
 ```{r}
 a <-treino %>% group_by(situacao_final) %>% 
   summarise(totalAparece = n())
@@ -54,10 +55,12 @@ p <- plot_ly(a,x =~indexS,y = ~totalAparece,type = 'bar', name = 'Situações') 
 
 p
 ```
-##podemos falar que, como mostra os dados do treino, os resultados poderiam ser totalmente inviezados
-##para mudar esses dados, vamos usar o under-simpling
+ 
+  Como isso pode ser prejudicial ao nosso estudo, fazendo com o que o resultado se torne enviezado, vamos tentar ajustar os dados da melhor maneira possível.
+  Existem 3 métodos simples para se fazer isso: "up", onde vamos aumentar o parâmetro que está em menor vigor; "down", onde vamos diminuir o parâmetro que está em maior vigor; e o "both", que vai fazer um pouco dos dois.
+  Nesse estudo, optei por usar o "both", tendo em vista que se usássemos o "down", restariam pouquíssimos dados para o estudo. Já o "up", vários novos dados teriam que ser criados, o que poderia afetar o no resultado final.
 
-##dados que vou usar para plotar os dados
+
 ```{r}
 treino_balanced <- ovun.sample(situacao_final~., data=treino,p=0.5, seed=1,method="both")$data
 
@@ -77,11 +80,15 @@ p_balanced
 
 ```
 
+  Podemos ver que, ao final do processo, os dados não apresentam tanta diferença.
+  <h2>Para o resto do processo, vamos usar os dados balanceados.</h2>
+  
 <h3>2.Treine: um modelo de regressão logística, uma árvore de decisão e um modelo de adaboost. Tune esses modelos usando validação cruzada e controle overfitting se necessário, considerando as particularidades de cada modelo.</h3>
 
+  <h2>Regressão logística</h2>
+  
 
-
-Para a nossa fórmula, iremos usar os dados que tiveram melhor eficácia quando tentamos predizer o número de votos (lab 3 da disciplina de ad2 -> https://rpubs.com/joaolcaas/predicao_2014_ad2)
+  Para a nossa fórmula, iremos usar os dados que tiveram melhor eficácia quando tentamos predizer o número de votos (lab 3 da disciplina de ad2 -> https://rpubs.com/joaolcaas/predicao_2014_ad2)
 
 ```{r}
 ctrl <- trainControl(method = "repeatedcv", 
@@ -93,7 +100,8 @@ formula.votos = as.formula(situacao_final ~  total_receita + total_despesa + qua
 ```
 
 
-Para testar a nossa fórmula, vamos usar a regressão logística.(FALAR SOBRE A REGRESSÃO)
+  Para testar a nossa fórmula, vamos usar a regressão logística, que é um técnica que usa conceito similiar ao de regressão linear,porém, com uma diferença de que a variável dependente é uma variável discreta.
+  
 
 ```{r}
 regressaoLogistica <- train(formula.votos,
@@ -109,9 +117,10 @@ varImp(regressaoLogistica)
 
 ```
 
-Pela nossa regressão logistica, vimos que os dados mais altos na votacao(como total_receita, que tinha 100 de importancia) desceram bastante e não são mais o mesmo.Além disso podemos ver o valor da Acurácia, que é de 0.8841712. Essa é uma métrica importante quando estamos falando sobre regressão logística(FALAR SOBRE ACURÁCIA). 
 
-Vamos usar outra formula, adicionando novos atributos, deixando apenas as variáveis mais importantes segundo a regressão logistica
+  Pela nossa regressão logistica, vimos que os dados mais altos na votacao(como total_receita, que tinha 100 de importancia) desceram bastante e não são mais o mesmo.Além disso podemos ver o valor da Acurácia, que é de 0.8841712. Essa é uma métrica importante quando estamos falando sobre regressão logística pois nos diz a proporção de observações corretamente classificadas. 
+
+  Vamos usar outra formula, adicionando novos atributos, deixando apenas as variáveis mais importantes segundo a regressão logistica
 
 ```{r}
 
@@ -128,10 +137,12 @@ regressaoLogisticaNovaFormula <- train(formula.situacao.final,
 regressaoLogisticaNovaFormula
 
 ```
-Para a nova fórmula, vemos que a Acurácia teve uma pequena melhora, mesmo estando com 7 preditores.
+  Para a nova fórmula, vemos que a Acurácia teve uma pequena melhora, mesmo estando com 7 preditores.
 
-##arvore de decisão
-
+  <h2>Árvore de decisão</h2>
+  
+  Particionando a "árvore", esse modelo gera resultados a partir de parâmetros que demostram se o valor de tal parâmetro leva a um resultado positivo ou negativo. 
+  
 ```{r}
 control <- rpart.control(maxdepth=20,minsplit=20,cp=0.001)
   
@@ -143,7 +154,7 @@ prp(arvore)
 
 ```{r}
 
-arvore1 <- train(formula.situacao.final,
+arvore1 <- train(formula.votos,
                 data= treino_balanced, method = "rpart",
                 trControl = ctrl,
                 cp=0.001,  # parâmetro de complexidade
@@ -153,21 +164,91 @@ arvore1
 
 Como o algoritmo seleciona a melhor Acurácia, o valor do cp retornado é de cp = 0.03765972, que vai nos levar a uma acurácia de 0.8869805, sendo um pouco menor do que a da regressão logística (aproximadamente 0.89). Isso pode ter se dado ao fato de que temos duas variáveis a menos aqui, em relação a fórmula da regressão logística. 
 
-##usando adboost
-
-Para o AdaBoost, vamos usar a fórmula que melhor se expressou na refressão logistica
+  <h2>Adaboost</h2>
+  
+  Assim como as outras técnicas, adaboost vai nos ajudar a predizer quem será eleito, porém, com mais poder, tendo em vista que, a técnica estuda a predição e aumenta os pesos das variáveis que são de mais importância.
+  
 ```{r}
-modelo <- train(formula.situacao.final,
+adaboost <- train(formula.situacao.final,
                 data=treino_balanced,
                 trControl = ctrl,
                 method = "adaboost")
 
-modelo
+adaboost
 ```
 
 <h3>3.Reporte acurácia, precision, recall e f-measure no treino e validação. Como você avalia os resultados? Justifique sua resposta.</h3>
+  
+  <h2>No treino </h2>
+```{r}
 
+treino$predicao.alguma coisa <- predict(regressaoLogisticaNovaFormula, treino_balanced$situacao_final)
 
+TP <- teste %>% filter(Class == "eleito", predicao == "eleito") %>% nrow()
+TN <- teste %>% filter(Class == "nao_eleito" , predicao == "nao_eleito" ) %>% nrow()
+FP <- teste %>% filter(Class == "nao_eleito" , predicao == "eleito") %>% nrow()
+FN <- teste %>% filter(Class == "eleito", predicao == "nao_eleito" ) %>% nrow()
+
+accuracy <- (TP + TN)/(TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)
+Fmeasure <- 2*(recall*precision)/(recall+precision)
+
+accuracy
+precision
+recall
+Fmeasure
+
+```
+  <h2>No teste</h2>
+```{r}
+teste$predicao.algumacoisa <- predict(regressaoLogisticaNovaFormula, teste$situacao_final)
+
+TP <- teste %>% filter(Class == "eleito", predicao == "eleito") %>% nrow()
+TN <- teste %>% filter(Class == "nao_eleito" , predicao == "nao_eleito" ) %>% nrow()
+FP <- teste %>% filter(Class == "nao_eleito" , predicao == "eleito") %>% nrow()
+FN <- teste %>% filter(Class == "eleito", predicao == "nao_eleito" ) %>% nrow()
+
+accuracy <- (TP + TN)/(TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)
+Fmeasure <- 2*(recall*precision)/(recall+precision)
+
+accuracy
+precision
+recall
+Fmeasure
+
+```
+  
 
 <h3>4.Interprete as saídas dos modelos. Quais atributos parecem ser mais importantes de acordo com cada modelo? Crie pelo menos um novo atributo que não está nos dados originais e estude o impacto desse atributo</h3>  
+  <h2>Regressão logística</h2>
+```{r}
+varImp(regressaoLogistica)
+```
+  <h2>Arvore</h2>
+```{r}
+varImp(arvore1)
+```
+  
+  <h2>Adaboost</h2>
+```{r}
+varImp(adaboost)
+```
+  <h2>Para criar uma nova variável</h2>
+```{r}
+
+```
+  
+  
+<h3>Enviando o melhor modelo para o kaggle</h3>
+
+
+
+
+
+<h3>Referências</h3>
+1.https://shiring.github.io/machine_learning/2017/04/02/unbalanced
+2.https://hackinganalytics.files.wordpress.com/2016/09/rare.pdf
   
